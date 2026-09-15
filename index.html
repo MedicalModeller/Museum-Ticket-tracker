@@ -1,1 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Case File: Visitor Intelligence — Trent Park House of Secrets</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #EFE7D3;
+    --paper-dark: #E4D9BC;
+    --ink: #23241F;
+    --ink-soft: #4A4A3F;
+    --stamp-red: #8B3A2F;
+    --olive: #5B6650;
+    --brass: #A9822F;
+    --line: rgba(35, 36, 31, 0.18);
+  }
 
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    background-image:
+      repeating-linear-gradient(0deg, rgba(35,36,31,0.025) 0px, rgba(35,36,31,0.025) 1px, transparent 1px, transparent 3px);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans', sans-serif;
+    padding: 32px 20px 60px;
+  }
+
+  .sheet {
+    max-width: 940px;
+    margin: 0 auto;
+    background: var(--paper);
+    border: 1.5px solid var(--ink);
+    position: relative;
+    box-shadow: 0 6px 0 rgba(35,36,31,0.06), 0 1px 0 rgba(35,36,31,0.3);
+  }
+
+  .tab {
+    position: absolute;
+    top: -22px;
+    left: 32px;
+    background: var(--olive);
+    color: var(--paper);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    padding: 6px 14px 5px;
+    border: 1.5px solid var(--ink);
+    border-bottom: none;
+  }
+
+  .stamp {
+    position: absolute;
+    top: 26px;
+    right: 28px;
+    border: 3px solid var(--stamp-red);
+    color: var(--stamp-red);
+    font-family: 'Special Elite', cursive;
+    font-size: 13px;
+    padding: 6px 12px;
+    transform: rotate(6deg);
+    opacity: 0.82;
+    border-radius: 2px;
+    letter-spacing: 0.03em;
+  }
+
+  header {
+    padding: 46px 40px 22px;
+    border-bottom: 1.5px dashed var(--line);
+  }
+
+  .eyebrow-line {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-bottom: 10px;
+  }
+
+  h1 {
+    font-family: 'Special Elite', cursive;
+    font-weight: 400;
+    font-size: 34px;
+    line-height: 1.2;
+    margin: 0 0 8px;
+    color: var(--ink);
+  }
+
+  .subhead {
+    font-size: 14.5px;
+    color: var(--ink-soft);
+    max-width: 62ch;
+  }
+
+  section {
+    border-bottom: 1.5px dashed var(--line);
+  }
+
+  .section-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 26px 40px 0;
+  }
+
+  .section-head h2 {
+    font-family: 'Special Elite', cursive;
+    font-weight: 400;
+    font-size: 19px;
+    margin: 0;
+  }
+
+  .section-head .tag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11.5px;
+    color: var(--ink-soft);
+  }
+
+  .today-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    padding: 18px 0 6px;
+  }
+
+  .today-stats .stat {
+    padding: 12px 40px 26px;
+  }
+
+  .today-stats .stat + .stat {
+    border-left: 1.5px dashed var(--line);
+  }
+
+  .stat-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    margin-bottom: 10px;
+  }
+
+  .stat-value {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 500;
+    font-size: 40px;
+    line-height: 1;
+    letter-spacing: -0.01em;
+  }
+
+  .stat-value.grand {
+    color: var(--stamp-red);
+  }
+
+  .stat-sub {
+    margin-top: 8px;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+  }
+
+  table {
+    width: calc(100% - 80px);
+    margin: 4px 40px 30px;
+    border-collapse: collapse;
+    font-size: 13.5px;
+  }
+
+  th, td {
+    text-align: left;
+    padding: 9px 10px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  th {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    color: var(--ink-soft);
+    font-weight: 500;
+    text-transform: none;
+  }
+
+  td.num, th.num {
+    text-align: right;
+    font-family: 'IBM Plex Mono', monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  tr.total td {
+    border-top: 1.5px solid var(--ink);
+    border-bottom: none;
+    font-weight: 600;
+  }
+
+  .opening-stats {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+  }
+
+  .opening-stats .stat {
+    padding: 24px 40px 30px;
+  }
+
+  .opening-stats .stat + .stat {
+    border-left: 1.5px dashed var(--line);
+  }
+
+  .opening-stats .stat-value {
+    font-size: 42px;
+  }
+
+  .opening-stats .stat-value.small {
+    font-size: 34px;
+  }
+
+  .chart-section {
+    padding: 26px 40px 40px;
+  }
+
+  .chart-frame {
+    background: var(--paper-dark);
+    border: 1px solid var(--line);
+    padding: 16px 18px 8px;
+  }
+
+  .chart-frame svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+  }
+
+  .axis-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    fill: var(--ink-soft);
+  }
+
+  .grid-line {
+    stroke: rgba(35,36,31,0.12);
+    stroke-width: 1;
+  }
+
+  .bar-advance {
+    fill: var(--olive);
+  }
+
+  .bar-onday {
+    fill: var(--stamp-red);
+  }
+
+  .bar-advance:hover,
+  .bar-onday:hover {
+    opacity: 0.8;
+  }
+
+  .chart-tooltip-bg {
+    fill: var(--ink);
+    opacity: 0.92;
+  }
+
+  .chart-tooltip {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    fill: var(--paper);
+  }
+
+  .chart-legend {
+    display: flex;
+    gap: 22px;
+    margin-bottom: 12px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+  }
+
+  .chart-legend .swatch {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .chart-legend .dot {
+    width: 10px;
+    height: 10px;
+    display: inline-block;
+    border-radius: 1px;
+  }
+
+  .chart-legend .dot.advance { background: var(--olive); }
+  .chart-legend .dot.onday { background: var(--stamp-red); }
+
+  footer {
+    padding: 18px 40px 34px;
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+
+  @media (max-width: 640px) {
+    .today-stats { grid-template-columns: 1fr; }
+    .today-stats .stat + .stat { border-left: none; border-top: 1.5px dashed var(--line); }
+    .opening-stats { grid-template-columns: 1fr; }
+    .opening-stats .stat + .stat { border-left: none; border-top: 1.5px dashed var(--line); }
+    header, .section-head, table, .chart-section, footer { padding-left: 22px !important; padding-right: 22px !important; }
+    table { width: calc(100% - 44px); margin-left: 22px; margin-right: 22px; }
+    .stamp { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="sheet">
+  <div class="tab">FILE NO. TPH-2026-VIS</div>
+  <div class="stamp">IN CONFIDENCE</div>
+  <div class="tag" id="dataSourceTag" style="position:absolute; top:70px; right:28px; font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--ink-soft);"></div>
+
+  <header>
+    <div class="eyebrow-line">Trent Park House of Secrets · Visitor Intelligence</div>
+    <h1>Daily Ticket Tally, Combined</h1>
+    <p class="subhead">Online advance bookings and on-the-day till sales, reconciled into one count per ticket type. Illustrative mock-up — figures below are invented for demonstration only.</p>
+  </header>
+
+  <section>
+    <div class="section-head">
+      <h2>Today's Tickets</h2>
+      <span class="tag" id="todayDateTag">—</span>
+    </div>
+    <div class="today-stats">
+      <div class="stat">
+        <div class="stat-label">SOLD IN ADVANCE (ONLINE)</div>
+        <div class="stat-value" id="advanceTotal">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">SOLD ON THE DAY</div>
+        <div class="stat-value" id="ondayTotal">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">TOTAL VISITORS TODAY</div>
+        <div class="stat-value grand" id="todayGrandTotal">—</div>
+      </div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Ticket type</th>
+          <th class="num">Advance (online)</th>
+          <th class="num">On the day</th>
+          <th class="num">Total</th>
+        </tr>
+      </thead>
+      <tbody id="breakdownBody"></tbody>
+      <tfoot>
+        <tr class="total">
+          <td>Total</td>
+          <td class="num" id="footAdvance">—</td>
+          <td class="num" id="footOnday">—</td>
+          <td class="num" id="footTotal">—</td>
+        </tr>
+      </tfoot>
+    </table>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Since Opening</h2>
+      <span class="tag">Tue 21 Jul 2026 – present</span>
+    </div>
+    <div class="opening-stats">
+      <div class="stat">
+        <div class="stat-label">TOTAL VISITORS SINCE OPENING</div>
+        <div class="stat-value" id="totalSinceOpening">—</div>
+        <div class="stat-sub">Since Tuesday 21 July 2026</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">THIS WEEK (TUE–SUN)</div>
+        <div class="stat-value small" id="thisWeekTotal">—</div>
+        <div class="stat-sub" id="thisWeekRange">—</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="chart-section">
+    <div class="section-head" style="padding:0 0 18px;">
+      <h2>Daily Visitors</h2>
+      <span class="tag" id="chartRange">—</span>
+    </div>
+    <div class="chart-legend">
+      <span class="swatch"><span class="dot advance"></span>Advance (online)</span>
+      <span class="swatch"><span class="dot onday"></span>On the day (walk-in)</span>
+    </div>
+    <div class="chart-frame">
+      <svg id="dailyChart" viewBox="0 0 860 300" preserveAspectRatio="none"></svg>
+    </div>
+  </div>
+
+  <footer>
+    Mock-up only — the real version pulls live figures from Shopify order data each evening and emails this tally to the Director automatically.
+  </footer>
+</div>
+
+<script>
+// ---- Mock data generation (deterministic, for illustration only) ----
+const OPEN_DATE = new Date(2026, 6, 21); // 21 July 2026 (Tuesday)
+const TODAY = new Date(2026, 8, 13);     // 13 September 2026
+
+function seededRand(seed) {
+  const x = Math.sin(seed * 999.7) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+const weekdayWeight = { 2: 0.80, 3: 0.70, 4: 0.75, 5: 0.90, 6: 1.40, 0: 1.30 }; // 0=Sun..6=Sat, Mon(1) closed
+const scale = 341.9;
+
+// ---- Live data source ----
+// Once Code.gs's "Public" sheet is published (File > Share > Publish to
+// web > CSV), paste that URL here. Until then, PUBLIC_CSV_URL stays empty
+// and the dashboard falls back to generated mock data automatically.
+const PUBLIC_CSV_URL = '';
+
+async function loadTallyData() {
+  if (PUBLIC_CSV_URL) {
+    try {
+      const res = await fetch(PUBLIC_CSV_URL);
+      if (!res.ok) throw new Error('Fetch failed: ' + res.status);
+      const csvText = await res.text();
+      return parseTallyCsv(csvText);
+    } catch (err) {
+      console.warn('Live data fetch failed, falling back to mock data:', err);
+    }
+  }
+  return generateMockData();
+}
+
+// Parses the Daily Tally / Public sheet's CSV shape:
+// Visit Date, [Type — Advance, Type — On The Day] per ticket type,
+// Advance Total, On The Day Total, Grand Total
+const TICKET_TYPE_NAMES = ['Adult', 'Student', 'Junior (5-17)', 'Child (Under 5)', 'Carer', 'Museum Pass'];
+
+function parseTallyCsv(csvText) {
+  const lines = csvText.trim().split('\n').map(l => l.split(','));
+  const body = lines.slice(1);
+
+  const dates = [];
+  const counts = [];
+  const dailyAdvance = [];
+  const dailyOnday = [];
+  const perTypeRows = []; // per day: [{name, advance, onday, total}, ...]
+
+  body.forEach(cols => {
+    const [y, m, d] = cols[0].split('-').map(Number);
+    dates.push(new Date(y, m - 1, d));
+
+    const typeBreakdown = TICKET_TYPE_NAMES.map((name, i) => {
+      const advance = Number(cols[1 + i * 2]);
+      const onday = Number(cols[2 + i * 2]);
+      return { name, advance, onday, total: advance + onday };
+    });
+    perTypeRows.push(typeBreakdown);
+
+    const advanceTotal = Number(cols[cols.length - 3]);
+    const ondayTotal = Number(cols[cols.length - 2]);
+    dailyAdvance.push(advanceTotal);
+    dailyOnday.push(ondayTotal);
+    counts.push(advanceTotal + ondayTotal);
+  });
+
+  return { dates, counts, dailyAdvance, dailyOnday, perTypeRows, isLive: true };
+}
+
+function generateMockData() {
+  const dates = [];
+  const counts = [];
+  let d = new Date(OPEN_DATE);
+  let i = 0;
+  while (d <= TODAY) {
+    if (d.getDay() !== 1) {
+      const weekIndex = Math.floor(i / 6);
+      const growth = 1 + Math.min(weekIndex, 10) * 0.015;
+      const jitter = 0.85 + seededRand(i + 1) * 0.3;
+      const base = weekdayWeight[d.getDay()] * scale * growth * jitter;
+      dates.push(new Date(d));
+      counts.push(Math.round(base));
+      i++;
+    }
+    d.setDate(d.getDate() + 1);
+  }
+
+  const dailyAdvance = [];
+  const dailyOnday = [];
+  const perTypeRows = [];
+  const mockShares = [
+    { name: 'Adult', share: 0.42, advanceRatio: 0.75 },
+    { name: 'Junior (5-17)', share: 0.24, advanceRatio: 0.65 },
+    { name: 'Student', share: 0.10, advanceRatio: 0.55 },
+    { name: 'Museum Pass', share: 0.13, advanceRatio: 0.00 },
+    { name: 'Carer', share: 0.07, advanceRatio: 0.40 },
+    { name: 'Child (Under 5)', share: 0.04, advanceRatio: 0.50 }
+  ];
+
+  counts.forEach((c, idx) => {
+    const ratio = 0.60 + (seededRand(idx * 7 + 3) - 0.5) * 0.16;
+    const adv = Math.round(c * ratio);
+    dailyAdvance.push(adv);
+    dailyOnday.push(c - adv);
+
+    let allocated = 0;
+    const typeBreakdown = mockShares.map(t => {
+      const total = Math.round(c * t.share);
+      allocated += total;
+      return { name: t.name, total, advanceRatio: t.advanceRatio };
+    });
+    typeBreakdown[0].total += (c - allocated);
+    typeBreakdown.forEach(t => {
+      t.advance = Math.round(t.total * t.advanceRatio);
+      t.onday = t.total - t.advance;
+    });
+    perTypeRows.push(typeBreakdown);
+  });
+
+  return { dates, counts, dailyAdvance, dailyOnday, perTypeRows, isLive: false };
+}
+
+async function render() {
+  const { dates, counts, dailyAdvance, dailyOnday, perTypeRows, isLive } = await loadTallyData();
+
+  const dow = TODAY.getDay();
+  const daysSinceTue = (dow - 2 + 7) % 7;
+  const weekStart = new Date(TODAY);
+  weekStart.setDate(TODAY.getDate() - daysSinceTue);
+  let thisWeekTotal = 0;
+  for (let k = 0; k < dates.length; k++) {
+    if (dates[k] >= weekStart && dates[k] <= TODAY) thisWeekTotal += counts[k];
+  }
+
+  const fmt = n => n.toLocaleString('en-GB');
+  const dfmt = dt => dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+  const dfmtFull = dt => dt.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+
+const totalSinceOpening = counts.reduce((a, b) => a + b, 0);
+document.getElementById('todayDateTag').textContent = dfmtFull(TODAY);
+document.getElementById('totalSinceOpening').textContent = fmt(totalSinceOpening);
+document.getElementById('thisWeekTotal').textContent = fmt(thisWeekTotal);
+document.getElementById('thisWeekRange').textContent = `${dfmt(weekStart)} – ${dfmt(TODAY)}`;
+document.getElementById('chartRange').textContent = `${dfmt(OPEN_DATE)} – ${dfmt(TODAY)}`;
+
+// ---- Today's ticket type x channel breakdown ----
+const todayRows = perTypeRows[perTypeRows.length - 1];
+const advanceTotal = todayRows.reduce((s, r) => s + r.advance, 0);
+const ondayTotal = todayRows.reduce((s, r) => s + r.onday, 0);
+
+document.getElementById('advanceTotal').textContent = fmt(advanceTotal);
+document.getElementById('ondayTotal').textContent = fmt(ondayTotal);
+document.getElementById('todayGrandTotal').textContent = fmt(advanceTotal + ondayTotal);
+document.getElementById('footAdvance').textContent = fmt(advanceTotal);
+document.getElementById('footOnday').textContent = fmt(ondayTotal);
+document.getElementById('footTotal').textContent = fmt(advanceTotal + ondayTotal);
+
+const tbody = document.getElementById('breakdownBody');
+todayRows.forEach(r => {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td>${r.name}</td><td class="num">${fmt(r.advance)}</td><td class="num">${fmt(r.onday)}</td><td class="num">${fmt(r.total)}</td>`;
+  tbody.appendChild(tr);
+});
+
+// ---- Hand-drawn SVG line/area chart (no external dependencies) ----
+const svg = document.getElementById('dailyChart');
+const W = 860, H = 300;
+const padL = 34, padR = 10, padT = 14, padB = 26;
+const plotW = W - padL - padR;
+const plotH = H - padT - padB;
+
+const maxVal = Math.max(...counts) * 1.1;
+const xStep = plotW / (counts.length - 1);
+const xAt = idx => padL + idx * xStep;
+const yAt = val => padT + plotH - (val / maxVal) * plotH;
+
+function svgEl(tag, attrs) {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const k in attrs) el.setAttribute(k, attrs[k]);
+  return el;
+}
+
+// Gridlines + y-axis labels (4 bands)
+const gridCount = 4;
+for (let g = 0; g <= gridCount; g++) {
+  const val = (maxVal / gridCount) * g;
+  const y = yAt(val);
+  svg.appendChild(svgEl('line', { x1: padL, x2: W - padR, y1: y, y2: y, class: 'grid-line' }));
+  const label = svgEl('text', { x: 4, y: y + 3, class: 'axis-label' });
+  label.textContent = Math.round(val);
+  svg.appendChild(label);
+}
+
+// X-axis date labels (sparse)
+const labelEvery = Math.ceil(dates.length / 9);
+dates.forEach((dt, idx) => {
+  if (idx % labelEvery === 0 || idx === dates.length - 1) {
+    const label = svgEl('text', { x: xAt(idx), y: H - 6, class: 'axis-label', 'text-anchor': 'middle' });
+    label.textContent = dfmt(dt);
+    svg.appendChild(label);
+  }
+});
+
+// Stacked bars: advance (bottom) + on-the-day (top) = total
+const barGap = 1.5;
+const barWidth = Math.max(plotW / counts.length - barGap, 1.5);
+
+const tooltipGroup = svgEl('g', { visibility: 'hidden' });
+const tooltipBg = svgEl('rect', { class: 'chart-tooltip-bg', rx: 3 });
+const tooltipText1 = svgEl('text', { class: 'chart-tooltip', x: 0, y: 0 });
+const tooltipText2 = svgEl('text', { class: 'chart-tooltip', x: 0, y: 14 });
+tooltipGroup.appendChild(tooltipBg);
+tooltipGroup.appendChild(tooltipText1);
+tooltipGroup.appendChild(tooltipText2);
+
+counts.forEach((total, idx) => {
+  const adv = dailyAdvance[idx];
+  const onday = dailyOnday[idx];
+  const cx = xAt(idx) - barWidth / 2;
+
+  const advTop = yAt(adv);
+  const advHeight = (padT + plotH) - advTop;
+  const advBar = svgEl('rect', {
+    x: cx, y: advTop, width: barWidth, height: advHeight, class: 'bar-advance'
+  });
+
+  const ondayTop = yAt(total);
+  const ondayHeight = advTop - ondayTop;
+  const ondayBar = svgEl('rect', {
+    x: cx, y: ondayTop, width: barWidth, height: Math.max(ondayHeight, 0), class: 'bar-onday'
+  });
+
+  const showTooltip = () => {
+    const line1 = `${dfmt(dates[idx])} — total ${fmt(total)}`;
+    const line2 = `advance ${fmt(adv)} · on the day ${fmt(onday)}`;
+    tooltipText1.textContent = line1;
+    tooltipText2.textContent = line2;
+    const boxWidth = Math.max(line1.length, line2.length) * 6 + 16;
+    let boxX = xAt(idx) - boxWidth / 2;
+    boxX = Math.min(Math.max(boxX, padL), W - padR - boxWidth);
+    const boxY = Math.max(yAt(total) - 42, padT);
+    tooltipBg.setAttribute('x', boxX);
+    tooltipBg.setAttribute('y', boxY);
+    tooltipBg.setAttribute('width', boxWidth);
+    tooltipBg.setAttribute('height', 34);
+    tooltipText1.setAttribute('x', boxX + 8);
+    tooltipText1.setAttribute('y', boxY + 14);
+    tooltipText2.setAttribute('x', boxX + 8);
+    tooltipText2.setAttribute('y', boxY + 27);
+    tooltipGroup.setAttribute('visibility', 'visible');
+  };
+  const hideTooltip = () => tooltipGroup.setAttribute('visibility', 'hidden');
+
+  advBar.addEventListener('mouseenter', showTooltip);
+  ondayBar.addEventListener('mouseenter', showTooltip);
+  advBar.addEventListener('mouseleave', hideTooltip);
+  ondayBar.addEventListener('mouseleave', hideTooltip);
+
+  svg.appendChild(advBar);
+  svg.appendChild(ondayBar);
+});
+
+svg.appendChild(tooltipGroup);
+
+  const sourceTag = document.getElementById('dataSourceTag');
+  if (sourceTag) {
+    sourceTag.textContent = isLive ? 'LIVE DATA' : 'MOCK DATA — illustrative only';
+  }
+}
+
+render();
+</script>
+
+</body>
+</html>
