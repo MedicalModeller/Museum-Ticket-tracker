@@ -316,7 +316,7 @@
   <header>
     <div class="eyebrow-line">Trent Park House of Secrets · Visitor Intelligence</div>
     <h1>Daily Ticket Tally, Combined</h1>
-    <p class="subhead">Online advance bookings and on-the-day till sales, reconciled into one count per ticket type. Illustrative mock-up — figures below are invented for demonstration only.</p>
+    <p class="subhead" id="pageSubhead">Online advance bookings and on-the-day till sales, reconciled into one count per ticket type.</p>
   </header>
 
   <section>
@@ -392,7 +392,7 @@
     </div>
   </div>
 
-  <footer>
+  <footer id="pageFooter">
     Mock-up only — the real version pulls live figures from Shopify order data each evening and emails this tally to the Director automatically.
   </footer>
 </div>
@@ -400,7 +400,8 @@
 <script>
 // ---- Mock data generation (deterministic, for illustration only) ----
 const OPEN_DATE = new Date(2026, 6, 21); // 21 July 2026 (Tuesday)
-const TODAY = new Date(2026, 8, 13);     // 13 September 2026
+const TODAY = new Date();                // real current date -- was hardcoded during mock-data development
+TODAY.setHours(0, 0, 0, 0);
 
 function seededRand(seed) {
   const x = Math.sin(seed * 999.7) * 43758.5453;
@@ -521,6 +522,27 @@ function generateMockData() {
 
 async function render() {
   const { dates, counts, dailyAdvance, dailyOnday, perTypeRows, isLive } = await loadTallyData();
+
+  const subhead = document.getElementById('pageSubhead');
+  const footer = document.getElementById('pageFooter');
+  if (isLive) {
+    subhead.textContent = 'Online advance bookings and on-the-day till sales, reconciled into one count per ticket type.';
+    footer.textContent = 'Figures update automatically each time the ticket tally runs.';
+  } else {
+    subhead.textContent = 'Online advance bookings and on-the-day till sales, reconciled into one count per ticket type. Illustrative mock-up — figures below are invented for demonstration only.';
+    footer.textContent = 'Mock-up only — the real version pulls live figures from Shopify order data each evening and emails this tally to the Director automatically.';
+  }
+
+  if (dates.length === 0) {
+    document.querySelector('.sheet').innerHTML += `
+      <div style="position:absolute; inset:0; top:120px; display:flex; align-items:flex-start; justify-content:center; padding-top:60px; background:rgba(239,231,211,0.97);">
+        <div style="text-align:center; max-width:40ch; font-family:'IBM Plex Sans',sans-serif;">
+          <div style="font-family:'Special Elite',cursive; font-size:20px; margin-bottom:10px;">No data yet</div>
+          <p style="color:var(--ink-soft); font-size:13.5px;">The Public sheet is connected but doesn't have any rows yet. Run <strong>runDailyTally</strong> in Apps Script at least once to populate today's figures.</p>
+        </div>
+      </div>`;
+    return;
+  }
 
   const dow = TODAY.getDay();
   const daysSinceTue = (dow - 2 + 7) % 7;
