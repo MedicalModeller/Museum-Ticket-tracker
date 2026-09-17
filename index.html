@@ -401,6 +401,20 @@
     </div>
   </div>
 
+  <div class="chart-section">
+    <div class="section-head" style="padding:0 0 18px;">
+      <h2>Weekly Visitors</h2>
+      <span class="tag">By operating week, Tue&ndash;Sun</span>
+    </div>
+    <div class="chart-legend">
+      <span class="swatch"><span class="dot advance"></span>Advance (online)</span>
+      <span class="swatch"><span class="dot onday"></span>On the day (walk-in)</span>
+    </div>
+    <div class="chart-frame">
+      <svg id="weeklyChart" viewBox="0 0 860 300" preserveAspectRatio="none"></svg>
+    </div>
+  </div>
+
   <footer id="pageFooter">
     Mock-up only — the real version pulls live figures from Shopify order data each evening and emails this tally to the Director automatically.
   </footer>
@@ -597,107 +611,186 @@ todayRows.forEach(r => {
   tbody.appendChild(tr);
 });
 
-// ---- Hand-drawn SVG line/area chart (no external dependencies) ----
-const svg = document.getElementById('dailyChart');
-const W = 860, H = 300;
-const padL = 34, padR = 10, padT = 14, padB = 26;
-const plotW = W - padL - padR;
-const plotH = H - padT - padB;
-
-const maxVal = Math.max(...counts) * 1.1;
-const xStep = plotW / (counts.length - 1);
-const xAt = idx => padL + idx * xStep;
-const yAt = val => padT + plotH - (val / maxVal) * plotH;
-
+// ---- Hand-drawn SVG stacked bar chart (no external dependencies), reusable for daily and weekly views ----
 function svgEl(tag, attrs) {
   const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
   for (const k in attrs) el.setAttribute(k, attrs[k]);
   return el;
 }
 
-// Gridlines + y-axis labels (4 bands)
-const gridCount = 4;
-for (let g = 0; g <= gridCount; g++) {
-  const val = (maxVal / gridCount) * g;
-  const y = yAt(val);
-  svg.appendChild(svgEl('line', { x1: padL, x2: W - padR, y1: y, y2: y, class: 'grid-line' }));
-  const label = svgEl('text', { x: 4, y: y + 3, class: 'axis-label' });
-  label.textContent = Math.round(val);
-  svg.appendChild(label);
-}
+function drawStackedBarChart(svg, labels, totals, advanceArr, ondayArr, tooltipLabelFn) {
+  const W = 860, H = 300;
+  const padL = 34, padR = 10, padT = 14, padB = 26;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
 
-// X-axis date labels (sparse)
-const labelEvery = Math.ceil(dates.length / 9);
-dates.forEach((dt, idx) => {
-  if (idx % labelEvery === 0 || idx === dates.length - 1) {
-    const label = svgEl('text', { x: xAt(idx), y: H - 6, class: 'axis-label', 'text-anchor': 'middle' });
-    label.textContent = dfmt(dt);
+  const maxVal = Math.max(...totals) * 1.1;
+  const xStep = plotW / (totals.length - 1 || 1);
+  const xAt = idx => padL + idx * xStep;
+  const yAt = val => padT + plotH - (val / maxVal) * plotH;
+
+  const gridCount = 4;
+  for (let g = 0; g <= gridCount; g++) {
+    const val = (maxVal / gridCount) * g;
+    const y = yAt(val);
+    svg.appendChild(svgEl('line', { x1: padL, x2: W - padR, y1: y, y2: y, class: 'grid-line' }));
+    const label = svgEl('text', { x: 4, y: y + 3, class: 'axis-label' });
+    label.textContent = Math.round(val);
     svg.appendChild(label);
   }
-});
 
-// Stacked bars: advance (bottom) + on-the-day (top) = total
-const barGap = 1.5;
-const barWidth = Math.max(plotW / counts.length - barGap, 1.5);
-
-const tooltipGroup = svgEl('g', { visibility: 'hidden' });
-const tooltipBg = svgEl('rect', { class: 'chart-tooltip-bg', rx: 3 });
-const tooltipText1 = svgEl('text', { class: 'chart-tooltip', x: 0, y: 0 });
-const tooltipText2 = svgEl('text', { class: 'chart-tooltip', x: 0, y: 14 });
-tooltipGroup.appendChild(tooltipBg);
-tooltipGroup.appendChild(tooltipText1);
-tooltipGroup.appendChild(tooltipText2);
-
-counts.forEach((total, idx) => {
-  const adv = dailyAdvance[idx];
-  const onday = dailyOnday[idx];
-  const cx = xAt(idx) - barWidth / 2;
-
-  const advTop = yAt(adv);
-  const advHeight = (padT + plotH) - advTop;
-  const advBar = svgEl('rect', {
-    x: cx, y: advTop, width: barWidth, height: advHeight, class: 'bar-advance'
+  const labelEvery = Math.max(Math.ceil(labels.length / 9), 1);
+  labels.forEach((lbl, idx) => {
+    if (idx % labelEvery === 0 || idx === labels.length - 1) {
+      const label = svgEl('text', { x: xAt(idx), y: H - 6, class: 'axis-label', 'text-anchor': 'middle' });
+      label.textContent = lbl;
+      svg.appendChild(label);
+    }
   });
 
-  const ondayTop = yAt(total);
-  const ondayHeight = advTop - ondayTop;
-  const ondayBar = svgEl('rect', {
-    x: cx, y: ondayTop, width: barWidth, height: Math.max(ondayHeight, 0), class: 'bar-onday'
+  const barGap = 1.5;
+  const barWidth = Math.max(plotW / totals.length - barGap, 1.5);
+
+  const tooltipGroup = svgEl('g', { visibility: 'hidden' });
+  const tooltipBg = svgEl('rect', { class: 'chart-tooltip-bg', rx: 3 });
+  const tooltipText1 = svgEl('text', { class: 'chart-tooltip', x: 0, y: 0 });
+  const tooltipText2 = svgEl('text', { class: 'chart-tooltip', x: 0, y: 14 });
+  tooltipGroup.appendChild(tooltipBg);
+  tooltipGroup.appendChild(tooltipText1);
+  tooltipGroup.appendChild(tooltipText2);
+
+  totals.forEach((total, idx) => {
+    const adv = advanceArr[idx];
+    const onday = ondayArr[idx];
+    const cx = xAt(idx) - barWidth / 2;
+
+    const advTop = yAt(adv);
+    const advHeight = (padT + plotH) - advTop;
+    const advBar = svgEl('rect', { x: cx, y: advTop, width: barWidth, height: advHeight, class: 'bar-advance' });
+
+    const ondayTop = yAt(total);
+    const ondayHeight = advTop - ondayTop;
+    const ondayBar = svgEl('rect', { x: cx, y: ondayTop, width: barWidth, height: Math.max(ondayHeight, 0), class: 'bar-onday' });
+
+    const showTooltip = () => {
+      const [line1, line2] = tooltipLabelFn(idx, total, adv, onday);
+      tooltipText1.textContent = line1;
+      tooltipText2.textContent = line2;
+      const boxWidth = Math.max(line1.length, line2.length) * 6 + 16;
+      let boxX = xAt(idx) - boxWidth / 2;
+      boxX = Math.min(Math.max(boxX, padL), W - padR - boxWidth);
+      const boxY = Math.max(yAt(total) - 42, padT);
+      tooltipBg.setAttribute('x', boxX);
+      tooltipBg.setAttribute('y', boxY);
+      tooltipBg.setAttribute('width', boxWidth);
+      tooltipBg.setAttribute('height', 34);
+      tooltipText1.setAttribute('x', boxX + 8);
+      tooltipText1.setAttribute('y', boxY + 14);
+      tooltipText2.setAttribute('x', boxX + 8);
+      tooltipText2.setAttribute('y', boxY + 27);
+      tooltipGroup.setAttribute('visibility', 'visible');
+    };
+    const hideTooltip = () => tooltipGroup.setAttribute('visibility', 'hidden');
+
+    advBar.addEventListener('mouseenter', showTooltip);
+    ondayBar.addEventListener('mouseenter', showTooltip);
+    advBar.addEventListener('mouseleave', hideTooltip);
+    ondayBar.addEventListener('mouseleave', hideTooltip);
+
+    svg.appendChild(advBar);
+    svg.appendChild(ondayBar);
   });
 
-  const showTooltip = () => {
-    const line1 = `${dfmt(dates[idx])} — total ${fmt(total)}`;
-    const line2 = `advance ${fmt(adv)} · on the day ${fmt(onday)}`;
-    tooltipText1.textContent = line1;
-    tooltipText2.textContent = line2;
-    const boxWidth = Math.max(line1.length, line2.length) * 6 + 16;
-    let boxX = xAt(idx) - boxWidth / 2;
-    boxX = Math.min(Math.max(boxX, padL), W - padR - boxWidth);
-    const boxY = Math.max(yAt(total) - 42, padT);
-    tooltipBg.setAttribute('x', boxX);
-    tooltipBg.setAttribute('y', boxY);
-    tooltipBg.setAttribute('width', boxWidth);
-    tooltipBg.setAttribute('height', 34);
-    tooltipText1.setAttribute('x', boxX + 8);
-    tooltipText1.setAttribute('y', boxY + 14);
-    tooltipText2.setAttribute('x', boxX + 8);
-    tooltipText2.setAttribute('y', boxY + 27);
-    tooltipGroup.setAttribute('visibility', 'visible');
-  };
-  const hideTooltip = () => tooltipGroup.setAttribute('visibility', 'hidden');
+  svg.appendChild(tooltipGroup);
+}
 
-  advBar.addEventListener('mouseenter', showTooltip);
-  ondayBar.addEventListener('mouseenter', showTooltip);
-  advBar.addEventListener('mouseleave', hideTooltip);
-  ondayBar.addEventListener('mouseleave', hideTooltip);
+// Fill in a continuous day-by-day range for the chart display, so closed
+// days (Mondays) show as a visible dip to zero rather than being skipped
+// entirely -- makes the weekly rhythm/weekends easier to read at a glance.
+// This is purely a display concern: totals, "Since Opening", "This Week"
+// etc. all stay based on the real (gap-free) dates/counts arrays above.
+const continuousDates = [];
+const continuousCounts = [];
+const continuousAdvance = [];
+const continuousOnday = [];
+if (dates.length) {
+  const dateIndexByKey = {};
+  dates.forEach((dt, idx) => { dateIndexByKey[dt.getTime()] = idx; });
 
-  svg.appendChild(advBar);
-  svg.appendChild(ondayBar);
+  let cursor = new Date(dates[0]);
+  const last = dates[dates.length - 1];
+  while (cursor <= last) {
+    const key = cursor.getTime();
+    if (key in dateIndexByKey) {
+      const idx = dateIndexByKey[key];
+      continuousCounts.push(counts[idx]);
+      continuousAdvance.push(dailyAdvance[idx]);
+      continuousOnday.push(dailyOnday[idx]);
+    } else {
+      continuousCounts.push(0);
+      continuousAdvance.push(0);
+      continuousOnday.push(0);
+    }
+    continuousDates.push(new Date(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+}
+
+// Daily chart
+drawStackedBarChart(
+  document.getElementById('dailyChart'),
+  continuousDates.map(dfmt),
+  continuousCounts,
+  continuousAdvance,
+  continuousOnday,
+  (idx, total, adv, onday) => total === 0
+    ? [`${dfmt(continuousDates[idx])} — closed`, '']
+    : [
+        `${dfmt(continuousDates[idx])} — total ${fmt(total)}`,
+        `advance ${fmt(adv)} · on the day ${fmt(onday)}`
+      ]
+);
+
+// Weekly chart -- grouped by the museum's own operating week (Tue-Sun),
+// consistent with the "This Week" stat elsewhere on the page.
+const weeklyMap = {}; // weekStart dateStr -> { advance, onday }
+dates.forEach((dt, idx) => {
+  const dow = dt.getDay();
+  const daysSinceTue = (dow - 2 + 7) % 7;
+  const weekStart = new Date(dt);
+  weekStart.setDate(dt.getDate() - daysSinceTue);
+  const key = Utilities_formatDateKey(weekStart);
+  if (!weeklyMap[key]) weeklyMap[key] = { advance: 0, onday: 0, weekStart };
+  weeklyMap[key].advance += dailyAdvance[idx];
+  weeklyMap[key].onday += dailyOnday[idx];
 });
 
-svg.appendChild(tooltipGroup);
+function Utilities_formatDateKey(d) {
+  return d.getFullYear() + '-' + (d.getMonth() + 1).toString().padStart(2, '0') + '-' + d.getDate().toString().padStart(2, '0');
+}
+
+const weekKeys = Object.keys(weeklyMap).sort();
+const weekStarts = weekKeys.map(k => weeklyMap[k].weekStart);
+const weeklyAdvance = weekKeys.map(k => weeklyMap[k].advance);
+const weeklyOnday = weekKeys.map(k => weeklyMap[k].onday);
+const weeklyTotals = weekKeys.map(k => weeklyMap[k].advance + weeklyMap[k].onday);
+
+const weekEndDate = ws => { const e = new Date(ws); e.setDate(ws.getDate() + 5); return e; };
+
+drawStackedBarChart(
+  document.getElementById('weeklyChart'),
+  weekStarts.map(dfmt),
+  weeklyTotals,
+  weeklyAdvance,
+  weeklyOnday,
+  (idx, total, adv, onday) => [
+    `Week of ${dfmt(weekStarts[idx])}–${dfmt(weekEndDate(weekStarts[idx]))} — total ${fmt(total)}`,
+    `advance ${fmt(adv)} · on the day ${fmt(onday)}`
+  ]
+);
 
   const sourceTag = document.getElementById('dataSourceTag');
+
   if (sourceTag) {
     sourceTag.textContent = isLive ? 'LIVE DATA' : 'MOCK DATA — illustrative only';
   }
