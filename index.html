@@ -618,20 +618,19 @@ function svgEl(tag, attrs) {
   return el;
 }
 
-function drawStackedBarChart(svg, labels, totals, advanceArr, ondayArr, tooltipLabelFn) {
+function drawStackedBarChart(svg, labels, totals, advanceArr, ondayArr, tooltipLabelFn, yGridStep) {
   const W = 860, H = 300;
   const padL = 34, padR = 10, padT = 14, padB = 26;
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
 
-  const maxVal = Math.max(...totals) * 1.1;
+  const rawMax = Math.max(...totals) * 1.1;
+  const maxVal = Math.ceil(rawMax / yGridStep) * yGridStep; // round the top of the scale up to a whole gridline step
   const xStep = plotW / (totals.length - 1 || 1);
   const xAt = idx => padL + idx * xStep;
   const yAt = val => padT + plotH - (val / maxVal) * plotH;
 
-  const gridCount = 4;
-  for (let g = 0; g <= gridCount; g++) {
-    const val = (maxVal / gridCount) * g;
+  for (let val = 0; val <= maxVal; val += yGridStep) {
     const y = yAt(val);
     svg.appendChild(svgEl('line', { x1: padL, x2: W - padR, y1: y, y2: y, class: 'grid-line' }));
     const label = svgEl('text', { x: 4, y: y + 3, class: 'axis-label' });
@@ -748,7 +747,8 @@ drawStackedBarChart(
     : [
         `${dfmt(continuousDates[idx])} — total ${fmt(total)}`,
         `advance ${fmt(adv)} · on the day ${fmt(onday)}`
-      ]
+      ],
+  100
 );
 
 // Weekly chart -- grouped by the museum's own operating week (Tue-Sun),
@@ -786,7 +786,8 @@ drawStackedBarChart(
   (idx, total, adv, onday) => [
     `Week of ${dfmt(weekStarts[idx])}–${dfmt(weekEndDate(weekStarts[idx]))} — total ${fmt(total)}`,
     `advance ${fmt(adv)} · on the day ${fmt(onday)}`
-  ]
+  ],
+  250
 );
 
   const sourceTag = document.getElementById('dataSourceTag');
