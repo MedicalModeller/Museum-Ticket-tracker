@@ -692,10 +692,14 @@ function drawStackedBarChart(svg, labels, totals, advanceArr, ondayArr, tooltipL
     };
     const hideTooltip = () => tooltipGroup.setAttribute('visibility', 'hidden');
 
-    advBar.addEventListener('mouseenter', showTooltip);
-    ondayBar.addEventListener('mouseenter', showTooltip);
-    advBar.addEventListener('mouseleave', hideTooltip);
-    ondayBar.addEventListener('mouseleave', hideTooltip);
+    advBar.addEventListener('pointerenter', showTooltip);
+    ondayBar.addEventListener('pointerenter', showTooltip);
+    advBar.addEventListener('pointerleave', hideTooltip);
+    ondayBar.addEventListener('pointerleave', hideTooltip);
+    // Belt-and-braces for touch: a tap always shows the tooltip even if
+    // pointerenter behaves inconsistently on a given device/OS version.
+    advBar.addEventListener('pointerdown', showTooltip);
+    ondayBar.addEventListener('pointerdown', showTooltip);
 
     svg.appendChild(advBar);
     svg.appendChild(ondayBar);
