@@ -265,6 +265,36 @@
     fill: var(--paper);
   }
 
+  .chart-nav {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .nav-btn {
+    background: var(--paper-dark);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    width: 26px;
+    height: 26px;
+    line-height: 1;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+
+  .nav-btn:hover:not(:disabled) {
+    background: var(--olive);
+    color: var(--paper);
+    border-color: var(--olive);
+  }
+
+  .nav-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+
   .chart-legend {
     display: flex;
     gap: 22px;
@@ -391,7 +421,11 @@
   <div class="chart-section">
     <div class="section-head" style="padding:0 0 18px;">
       <h2>Daily Visitors</h2>
-      <span class="tag" id="chartRange">—</span>
+      <div class="chart-nav">
+        <button class="nav-btn" id="dailyPrevBtn" aria-label="Earlier">&larr;</button>
+        <span class="tag" id="chartRange">—</span>
+        <button class="nav-btn" id="dailyNextBtn" aria-label="Later">&rarr;</button>
+      </div>
     </div>
     <div class="chart-legend">
       <span class="swatch"><span class="dot advance"></span>Advance (online)</span>
@@ -405,7 +439,11 @@
   <div class="chart-section">
     <div class="section-head" style="padding:0 0 18px;">
       <h2>Weekly Visitors</h2>
-      <span class="tag">By operating week, Tue&ndash;Sun</span>
+      <div class="chart-nav">
+        <button class="nav-btn" id="weeklyPrevBtn" aria-label="Earlier">&larr;</button>
+        <span class="tag" id="weeklyChartRange">By operating week, Tue&ndash;Sun</span>
+        <button class="nav-btn" id="weeklyNextBtn" aria-label="Later">&rarr;</button>
+      </div>
     </div>
     <div class="chart-legend">
       <span class="swatch"><span class="dot advance"></span>Advance (online)</span>
@@ -711,89 +749,134 @@ function drawStackedBarChart(svg, labels, totals, advanceArr, ondayArr, tooltipL
 // Fill in a continuous day-by-day range for the chart display, so closed
 // days (Mondays) show as a visible dip to zero rather than being skipped
 // entirely -- makes the weekly rhythm/weekends easier to read at a glance.
-// This is purely a display concern: totals, "Since Opening", "This Week"
-// etc. all stay based on the real (gap-free) dates/counts arrays above.
-const continuousDates = [];
-const continuousCounts = [];
-const continuousAdvance = [];
-const continuousOnday = [];
-if (dates.length) {
-  const dateIndexByKey = {};
-  dates.forEach((dt, idx) => { dateIndexByKey[dt.getTime()] = idx; });
-
-  let cursor = new Date(dates[0]);
-  const last = dates[dates.length - 1];
-  while (cursor <= last) {
-    const key = cursor.getTime();
-    if (key in dateIndexByKey) {
-      const idx = dateIndexByKey[key];
-      continuousCounts.push(counts[idx]);
-      continuousAdvance.push(dailyAdvance[idx]);
-      continuousOnday.push(dailyOnday[idx]);
-    } else {
-      continuousCounts.push(0);
-      continuousAdvance.push(0);
-      continuousOnday.push(0);
-    }
-    continuousDates.push(new Date(cursor));
-    cursor.setDate(cursor.getDate() + 1);
-  }
-}
-
-// Daily chart
-drawStackedBarChart(
-  document.getElementById('dailyChart'),
-  continuousDates.map(dfmt),
-  continuousCounts,
-  continuousAdvance,
-  continuousOnday,
-  (idx, total, adv, onday) => total === 0
-    ? [`${dfmt(continuousDates[idx])} — closed`, '']
-    : [
-        `${dfmt(continuousDates[idx])} — total ${fmt(total)}`,
-        `advance ${fmt(adv)} · on the day ${fmt(onday)}`
-      ],
-  100
-);
-
-// Weekly chart -- grouped by the museum's own operating week (Tue-Sun),
-// consistent with the "This Week" stat elsewhere on the page.
-const weeklyMap = {}; // weekStart dateStr -> { advance, onday }
+// ---- Windowed, pageable charts ----
+// Matches the PDF report's approach: fixed-size windows anchored on
+// opening day, rather than one ever-growing chart. Prev/Next buttons
+// step by a full window's width. A lookup by date lets any window
+// (past or future) be built on demand, zero-filling closed/no-data days.
+const dateLookup = {};
 dates.forEach((dt, idx) => {
-  const dow = dt.getDay();
-  const daysSinceTue = (dow - 2 + 7) % 7;
-  const weekStart = new Date(dt);
-  weekStart.setDate(dt.getDate() - daysSinceTue);
-  const key = Utilities_formatDateKey(weekStart);
-  if (!weeklyMap[key]) weeklyMap[key] = { advance: 0, onday: 0, weekStart };
-  weeklyMap[key].advance += dailyAdvance[idx];
-  weeklyMap[key].onday += dailyOnday[idx];
+  dateLookup[Utilities_formatDateKey(dt)] = { advance: dailyAdvance[idx], onday: dailyOnday[idx] };
 });
 
 function Utilities_formatDateKey(d) {
   return d.getFullYear() + '-' + (d.getMonth() + 1).toString().padStart(2, '0') + '-' + d.getDate().toString().padStart(2, '0');
 }
 
-const weekKeys = Object.keys(weeklyMap).sort();
-const weekStarts = weekKeys.map(k => weeklyMap[k].weekStart);
-const weeklyAdvance = weekKeys.map(k => weeklyMap[k].advance);
-const weeklyOnday = weekKeys.map(k => weeklyMap[k].onday);
-const weeklyTotals = weekKeys.map(k => weeklyMap[k].advance + weeklyMap[k].onday);
+function addMonths(date, months) {
+  const d = new Date(date);
+  d.setMonth(d.getMonth() + months);
+  return d;
+}
 
-const weekEndDate = ws => { const e = new Date(ws); e.setDate(ws.getDate() + 5); return e; };
+// Builds a continuous zero-filled daily series between two dates (inclusive).
+function buildDailyWindow(startDate, endDate) {
+  const outDates = [], outAdvance = [], outOnday = [], outTotals = [];
+  let cursor = new Date(startDate);
+  while (cursor <= endDate) {
+    const key = Utilities_formatDateKey(cursor);
+    const entry = dateLookup[key] || { advance: 0, onday: 0 };
+    outDates.push(new Date(cursor));
+    outAdvance.push(entry.advance);
+    outOnday.push(entry.onday);
+    outTotals.push(entry.advance + entry.onday);
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return { dates: outDates, advance: outAdvance, onday: outOnday, totals: outTotals };
+}
 
-drawStackedBarChart(
-  document.getElementById('weeklyChart'),
-  weekStarts.map(dfmt),
-  weeklyTotals,
-  weeklyAdvance,
-  weeklyOnday,
-  (idx, total, adv, onday) => [
-    `Week of ${dfmt(weekStarts[idx])}–${dfmt(weekEndDate(weekStarts[idx]))} — total ${fmt(total)}`,
-    `advance ${fmt(adv)} · on the day ${fmt(onday)}`
-  ],
-  250
-);
+const DAILY_WINDOW_MONTHS = 3;
+const WEEKLY_WINDOW_MONTHS = 5;
+let dailyWindowOffset = 0;   // months from opening day to the window's start
+let weeklyWindowOffset = 0;  // months from opening day to the window's start
+
+// Precise whole-month difference between two dates (used only to pick a
+// sensible default starting window -- Prev/Next always step by exactly
+// one month regardless of this).
+function monthsBetween(start, end) {
+  let months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+  if (end.getDate() < start.getDate()) months -= 1;
+  return months;
+}
+
+function renderDailyWindow() {
+  const windowStart = addMonths(OPEN_DATE, dailyWindowOffset);
+  const windowEnd = addMonths(windowStart, DAILY_WINDOW_MONTHS);
+  const w = buildDailyWindow(windowStart, windowEnd);
+
+  document.getElementById('dailyChart').innerHTML = '';
+  drawStackedBarChart(
+    document.getElementById('dailyChart'),
+    w.dates.map(dfmt),
+    w.totals,
+    w.advance,
+    w.onday,
+    (idx, total, adv, onday) => total === 0
+      ? [`${dfmt(w.dates[idx])} — closed`, '']
+      : [
+          `${dfmt(w.dates[idx])} — total ${fmt(total)}`,
+          `advance ${fmt(adv)} · on the day ${fmt(onday)}`
+        ],
+    100
+  );
+  document.getElementById('chartRange').textContent = `${dfmt(windowStart)} – ${dfmt(windowEnd)}`;
+  document.getElementById('dailyPrevBtn').disabled = dailyWindowOffset <= 0;
+}
+
+function renderWeeklyWindow() {
+  const windowStart = addMonths(OPEN_DATE, weeklyWindowOffset);
+  const windowEnd = addMonths(windowStart, WEEKLY_WINDOW_MONTHS);
+  const daily = buildDailyWindow(windowStart, windowEnd);
+
+  const byWeek = {};
+  daily.dates.forEach((dt, idx) => {
+    const dow = dt.getDay();
+    const daysSinceTue = (dow - 2 + 7) % 7;
+    const weekStart = new Date(dt);
+    weekStart.setDate(dt.getDate() - daysSinceTue);
+    const key = Utilities_formatDateKey(weekStart);
+    if (!byWeek[key]) byWeek[key] = { advance: 0, onday: 0, weekStart };
+    byWeek[key].advance += daily.advance[idx];
+    byWeek[key].onday += daily.onday[idx];
+  });
+
+  const weekKeys = Object.keys(byWeek).sort();
+  const weekStarts = weekKeys.map(k => byWeek[k].weekStart);
+  const weeklyAdvance = weekKeys.map(k => byWeek[k].advance);
+  const weeklyOnday = weekKeys.map(k => byWeek[k].onday);
+  const weeklyTotals = weekKeys.map(k => byWeek[k].advance + byWeek[k].onday);
+  const weekEndDate = ws => { const e = new Date(ws); e.setDate(ws.getDate() + 5); return e; };
+
+  document.getElementById('weeklyChart').innerHTML = '';
+  drawStackedBarChart(
+    document.getElementById('weeklyChart'),
+    weekStarts.map(dfmt),
+    weeklyTotals,
+    weeklyAdvance,
+    weeklyOnday,
+    (idx, total, adv, onday) => [
+      `Week of ${dfmt(weekStarts[idx])}–${dfmt(weekEndDate(weekStarts[idx]))} — total ${fmt(total)}`,
+      `advance ${fmt(adv)} · on the day ${fmt(onday)}`
+    ],
+    250
+  );
+  document.getElementById('weeklyChartRange').textContent = `${dfmt(windowStart)} – ${dfmt(windowEnd)}`;
+  document.getElementById('weeklyPrevBtn').disabled = weeklyWindowOffset <= 0;
+}
+
+document.getElementById('dailyPrevBtn').onclick = () => { dailyWindowOffset = Math.max(0, dailyWindowOffset - 1); renderDailyWindow(); };
+document.getElementById('dailyNextBtn').onclick = () => { dailyWindowOffset += 1; renderDailyWindow(); };
+document.getElementById('weeklyPrevBtn').onclick = () => { weeklyWindowOffset = Math.max(0, weeklyWindowOffset - 1); renderWeeklyWindow(); };
+document.getElementById('weeklyNextBtn').onclick = () => { weeklyWindowOffset += 1; renderWeeklyWindow(); };
+
+// Default to whichever window actually contains today, so the page
+// opens showing the current, relevant period rather than always
+// starting back at opening day.
+dailyWindowOffset = Math.max(0, monthsBetween(OPEN_DATE, TODAY) - DAILY_WINDOW_MONTHS + 1);
+weeklyWindowOffset = Math.max(0, monthsBetween(OPEN_DATE, TODAY) - WEEKLY_WINDOW_MONTHS + 1);
+
+renderDailyWindow();
+renderWeeklyWindow();
 
   const sourceTag = document.getElementById('dataSourceTag');
 
