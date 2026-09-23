@@ -409,6 +409,7 @@
         <div class="stat-label">TOTAL VISITORS SINCE OPENING</div>
         <div class="stat-value" id="totalSinceOpening">—</div>
         <div class="stat-sub">Since Tuesday 21 July 2026</div>
+        <div class="stat-sub" style="font-size:11px; opacity:0.75;">* Includes 119 group visitors (01–19 Sept) recorded manually, not yet captured via Shopify.</div>
       </div>
       <div class="stat">
         <div class="stat-label">THIS WEEK (TUE–SUN)</div>
@@ -463,6 +464,12 @@
 <script>
 // ---- Mock data generation (deterministic, for illustration only) ----
 const OPEN_DATE = new Date(2026, 6, 21); // 21 July 2026 (Tuesday)
+// Temporary manual correction: 119 group visitors between 1-19 September
+// attended without paying and without going through Shopify at all (no
+// group ticket type existed yet). Must be kept in sync with Code.gs's
+// CONFIG.MANUAL_VISITOR_ADJUSTMENT -- remove both once a proper Group
+// ticket type exists in Shopify and those visits flow through normally.
+const MANUAL_VISITOR_ADJUSTMENT = 119;
 const TODAY = new Date();                // real current date -- was hardcoded during mock-data development
 TODAY.setHours(0, 0, 0, 0);
 
@@ -621,7 +628,7 @@ async function render() {
   const dfmt = dt => dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
   const dfmtFull = dt => dt.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
 
-const totalSinceOpening = counts.reduce((a, b) => a + b, 0);
+const totalSinceOpening = counts.reduce((a, b) => a + b, 0) + MANUAL_VISITOR_ADJUSTMENT;
 document.getElementById('todayDateTag').textContent = dfmtFull(TODAY);
 document.getElementById('totalSinceOpening').textContent = fmt(totalSinceOpening);
 document.getElementById('thisWeekTotal').textContent = fmt(thisWeekTotal);
