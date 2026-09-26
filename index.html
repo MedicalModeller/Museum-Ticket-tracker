@@ -504,7 +504,7 @@ async function loadTallyData() {
 // Parses the Daily Tally / Public sheet's CSV shape:
 // Visit Date, [Type — Advance, Type — On The Day] per ticket type,
 // Advance Total, On The Day Total, Grand Total
-const TICKET_TYPE_NAMES = ['Adult (18+)', 'Student', 'Junior (Age 5-17)', 'Child (Under 5)', 'Carer', 'Museum Member admission', 'Art Fund'];
+const TICKET_TYPE_NAMES = ['Adult (18+)', 'Student', 'Junior (Age 5-17)', 'Child (Under 5)', 'Carer', 'Museum Member admission', 'Art Fund', 'Group'];
 
 function parseTallyCsv(csvText) {
   const lines = csvText.trim().split('\n').map(l => l.split(','));
@@ -559,13 +559,14 @@ function generateMockData() {
   const dailyOnday = [];
   const perTypeRows = [];
   const mockShares = [
-    { name: 'Adult (18+)', share: 0.40, advanceRatio: 0.75 },
-    { name: 'Junior (Age 5-17)', share: 0.22, advanceRatio: 0.65 },
+    { name: 'Adult (18+)', share: 0.38, advanceRatio: 0.75 },
+    { name: 'Junior (Age 5-17)', share: 0.20, advanceRatio: 0.65 },
     { name: 'Student', share: 0.10, advanceRatio: 0.55 },
     { name: 'Museum Member admission', share: 0.09, advanceRatio: 0.00 },
     { name: 'Art Fund', share: 0.04, advanceRatio: 0.00 },
     { name: 'Carer', share: 0.07, advanceRatio: 0.40 },
-    { name: 'Child (Under 5)', share: 0.08, advanceRatio: 0.50 }
+    { name: 'Child (Under 5)', share: 0.08, advanceRatio: 0.50 },
+    { name: 'Group', share: 0.04, advanceRatio: 0.00 }
   ];
 
   counts.forEach((c, idx) => {
