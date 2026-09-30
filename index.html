@@ -366,11 +366,11 @@
     </div>
     <div class="today-stats">
       <div class="stat">
-        <div class="stat-label">SOLD IN ADVANCE (ONLINE)</div>
+        <div class="stat-label">ONLINE</div>
         <div class="stat-value" id="advanceTotal">—</div>
       </div>
       <div class="stat">
-        <div class="stat-label">SOLD ON THE DAY</div>
+        <div class="stat-label">MUSEUM SHOP</div>
         <div class="stat-value" id="ondayTotal">—</div>
       </div>
       <div class="stat">
@@ -382,8 +382,8 @@
       <thead>
         <tr>
           <th>Ticket type</th>
-          <th class="num">Advance (online)</th>
-          <th class="num">On the day</th>
+          <th class="num">Online</th>
+          <th class="num">Museum Shop</th>
           <th class="num">Total</th>
         </tr>
       </thead>
@@ -429,8 +429,8 @@
       </div>
     </div>
     <div class="chart-legend">
-      <span class="swatch"><span class="dot advance"></span>Advance (online)</span>
-      <span class="swatch"><span class="dot onday"></span>On the day (walk-in)</span>
+      <span class="swatch"><span class="dot advance"></span>Online</span>
+      <span class="swatch"><span class="dot onday"></span>Museum Shop</span>
     </div>
     <div class="chart-frame">
       <svg id="dailyChart" viewBox="0 0 860 300" preserveAspectRatio="none"></svg>
@@ -447,8 +447,8 @@
       </div>
     </div>
     <div class="chart-legend">
-      <span class="swatch"><span class="dot advance"></span>Advance (online)</span>
-      <span class="swatch"><span class="dot onday"></span>On the day (walk-in)</span>
+      <span class="swatch"><span class="dot advance"></span>Online</span>
+      <span class="swatch"><span class="dot onday"></span>Museum Shop</span>
     </div>
     <div class="chart-frame">
       <svg id="weeklyChart" viewBox="0 0 860 300" preserveAspectRatio="none"></svg>
@@ -823,7 +823,7 @@ function renderDailyWindow() {
       ? [`${dfmt(w.dates[idx])} — closed`, '']
       : [
           `${dfmt(w.dates[idx])} — total ${fmt(total)}`,
-          `advance ${fmt(adv)} · on the day ${fmt(onday)}`
+          `online ${fmt(adv)} · museum shop ${fmt(onday)}`
         ],
     100
   );
@@ -864,7 +864,7 @@ function renderWeeklyWindow() {
     weeklyOnday,
     (idx, total, adv, onday) => [
       `Week of ${dfmt(weekStarts[idx])}–${dfmt(weekEndDate(weekStarts[idx]))} — total ${fmt(total)}`,
-      `advance ${fmt(adv)} · on the day ${fmt(onday)}`
+      `online ${fmt(adv)} · museum shop ${fmt(onday)}`
     ],
     250
   );
