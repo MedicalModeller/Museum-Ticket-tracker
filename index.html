@@ -419,6 +419,32 @@
     </div>
   </section>
 
+  <section>
+    <div class="section-head">
+      <h2>Total by Ticket Type</h2>
+      <span class="tag">Since opening</span>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Ticket type</th>
+          <th class="num">Online</th>
+          <th class="num">Museum Shop</th>
+          <th class="num">Total</th>
+        </tr>
+      </thead>
+      <tbody id="cumulativeBody"></tbody>
+      <tfoot>
+        <tr class="total">
+          <td>Grand total</td>
+          <td class="num" id="cumFootAdvance">—</td>
+          <td class="num" id="cumFootOnday">—</td>
+          <td class="num" id="cumFootTotal">—</td>
+        </tr>
+      </tfoot>
+    </table>
+  </section>
+
   <div class="chart-section">
     <div class="section-head" style="padding:0 0 18px;">
       <h2>Daily Visitors</h2>
@@ -453,6 +479,21 @@
     <div class="chart-frame">
       <svg id="weeklyChart" viewBox="0 0 860 300" preserveAspectRatio="none"></svg>
     </div>
+  </div>
+
+  <div class="chart-section">
+    <div class="section-head" style="padding:0 0 18px;">
+      <h2>Monthly Visitors</h2>
+      <span class="tag" id="monthlyChartRange">By calendar month</span>
+    </div>
+    <div class="chart-legend">
+      <span class="swatch"><span class="dot advance"></span>Online</span>
+      <span class="swatch"><span class="dot onday"></span>Museum Shop</span>
+    </div>
+    <div class="chart-frame">
+      <svg id="monthlyChart" viewBox="0 0 860 300" preserveAspectRatio="none"></svg>
+    </div>
+    <p style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--ink-soft); margin-top:8px;">July counts from opening day (21 July). Months are by visit date. The 119 unticketed group visitors are not included.</p>
   </div>
 
   <footer id="pageFooter">
@@ -630,6 +671,31 @@ async function render() {
   const dfmtFull = dt => dt.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
 
 const totalSinceOpening = counts.reduce((a, b) => a + b, 0) + MANUAL_VISITOR_ADJUSTMENT;
+// ---- Total since opening, by ticket type ----
+{
+  const cum = TICKET_TYPE_NAMES.map((name, i) => {
+    let a = 0, o = 0;
+    perTypeRows.forEach(day => { a += day[i].advance; o += day[i].onday; });
+    return { name, advance: a, onday: o };
+  });
+  const cumBody = document.getElementById('cumulativeBody');
+  cumBody.innerHTML = '';
+  cum.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${r.name}</td><td class="num">${fmt(r.advance)}</td><td class="num">${fmt(r.onday)}</td><td class="num">${fmt(r.advance + r.onday)}</td>`;
+    cumBody.appendChild(tr);
+  });
+  if (MANUAL_VISITOR_ADJUSTMENT) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>Unticketed groups *</td><td class="num">–</td><td class="num">–</td><td class="num">${fmt(MANUAL_VISITOR_ADJUSTMENT)}</td>`;
+    cumBody.appendChild(tr);
+  }
+  const cumA = cum.reduce((s, r) => s + r.advance, 0);
+  const cumO = cum.reduce((s, r) => s + r.onday, 0);
+  document.getElementById('cumFootAdvance').textContent = fmt(cumA);
+  document.getElementById('cumFootOnday').textContent = fmt(cumO);
+  document.getElementById('cumFootTotal').textContent = fmt(cumA + cumO + MANUAL_VISITOR_ADJUSTMENT);
+}
 document.getElementById('todayDateTag').textContent = dfmtFull(TODAY);
 document.getElementById('totalSinceOpening').textContent = fmt(totalSinceOpening);
 document.getElementById('thisWeekTotal').textContent = fmt(thisWeekTotal);
@@ -665,7 +731,7 @@ function svgEl(tag, attrs) {
   return el;
 }
 
-function drawStackedBarChart(svg, labels, totals, advanceArr, ondayArr, tooltipLabelFn, yGridStep) {
+function drawStackedBarChart(svg, labels, totals, advanceArr, ondayArr, tooltipLabelFn, yGridStep, centered) {
   const W = 860, H = 300;
   const padL = 34, padR = 10, padT = 14, padB = 26;
   const plotW = W - padL - padR;
@@ -673,8 +739,10 @@ function drawStackedBarChart(svg, labels, totals, advanceArr, ondayArr, tooltipL
 
   const rawMax = Math.max(...totals) * 1.1;
   const maxVal = Math.ceil(rawMax / yGridStep) * yGridStep; // round the top of the scale up to a whole gridline step
-  const xStep = plotW / (totals.length - 1 || 1);
-  const xAt = idx => padL + idx * xStep;
+  // 'centered' (used for the few, wide monthly bars) spaces bars evenly
+  // inside the plot area instead of pinning the first/last bar to the edges.
+  const xStep = centered ? plotW / totals.length : plotW / (totals.length - 1 || 1);
+  const xAt = idx => centered ? padL + (idx + 0.5) * xStep : padL + idx * xStep;
   const yAt = val => padT + plotH - (val / maxVal) * plotH;
 
   for (let val = 0; val <= maxVal; val += yGridStep) {
@@ -695,7 +763,9 @@ function drawStackedBarChart(svg, labels, totals, advanceArr, ondayArr, tooltipL
   });
 
   const barGap = 1.5;
-  const barWidth = Math.max(plotW / totals.length - barGap, 1.5);
+  const barWidth = centered
+    ? Math.min(plotW / totals.length * 0.6, 90)
+    : Math.max(plotW / totals.length - barGap, 1.5);
 
   const tooltipGroup = svgEl('g', { visibility: 'hidden' });
   const tooltipBg = svgEl('rect', { class: 'chart-tooltip-bg', rx: 3 });
@@ -872,6 +942,36 @@ function renderWeeklyWindow() {
   document.getElementById('weeklyPrevBtn').disabled = weeklyWindowOffset <= 0;
 }
 
+const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+// One bar per calendar month, from the opening month to two months
+// beyond the current one (so advance bookings already made show up).
+function renderMonthlyChart() {
+  const firstIdx = OPEN_DATE.getFullYear() * 12 + OPEN_DATE.getMonth();
+  const lastIdx = TODAY.getFullYear() * 12 + TODAY.getMonth() + 2;
+  const keys = [], labels = [];
+  for (let i = firstIdx; i <= lastIdx; i++) {
+    const y = Math.floor(i / 12), m = i % 12;
+    keys.push(y + '-' + String(m + 1).padStart(2, '0'));
+    labels.push(MONTH_NAMES[m] + ' ' + y);
+  }
+  const adv = keys.map(() => 0), onday = keys.map(() => 0);
+  dates.forEach((dt, idx) => {
+    const k = keys.indexOf(dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0'));
+    if (k >= 0) { adv[k] += dailyAdvance[idx]; onday[k] += dailyOnday[idx]; }
+  });
+  const totals = adv.map((a, i) => a + onday[i]);
+  const svg = document.getElementById('monthlyChart');
+  svg.innerHTML = '';
+  drawStackedBarChart(svg, labels, totals, adv, onday,
+    (idx, total, a, o) => [
+      `${labels[idx]} — total ${fmt(total)}`,
+      `online ${fmt(a)} · museum shop ${fmt(o)}`
+    ],
+    1000, true);
+  document.getElementById('monthlyChartRange').textContent = `${labels[0]} – ${labels[labels.length - 1]}`;
+}
+
 document.getElementById('dailyPrevBtn').onclick = () => { dailyWindowOffset = Math.max(0, dailyWindowOffset - 1); renderDailyWindow(); };
 document.getElementById('dailyNextBtn').onclick = () => { dailyWindowOffset += 1; renderDailyWindow(); };
 document.getElementById('weeklyPrevBtn').onclick = () => { weeklyWindowOffset = Math.max(0, weeklyWindowOffset - 1); renderWeeklyWindow(); };
@@ -885,6 +985,7 @@ weeklyWindowOffset = Math.max(0, monthsBetween(OPEN_DATE, TODAY) - WEEKLY_WINDOW
 
 renderDailyWindow();
 renderWeeklyWindow();
+renderMonthlyChart();
 
   const sourceTag = document.getElementById('dataSourceTag');
 
