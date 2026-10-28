@@ -326,6 +326,14 @@
     color: var(--ink-soft);
   }
 
+  .opening-hours {
+    padding: 4px 40px 0;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-style: italic;
+    color: var(--ink-soft);
+  }
+
   .credit-line {
     text-align: center;
     font-family: 'IBM Plex Mono', monospace;
@@ -340,7 +348,7 @@
     .today-stats .stat + .stat { border-left: none; border-top: 1.5px dashed var(--line); }
     .opening-stats { grid-template-columns: 1fr; }
     .opening-stats .stat + .stat { border-left: none; border-top: 1.5px dashed var(--line); }
-    header, .section-head, table, .chart-section, footer { padding-left: 22px !important; padding-right: 22px !important; }
+    header, .section-head, table, .chart-section, footer, .opening-hours { padding-left: 22px !important; padding-right: 22px !important; }
     table { width: calc(100% - 44px); margin-left: 22px; margin-right: 22px; }
     .stamp { display: none; }
   }
@@ -495,6 +503,8 @@
     </div>
     <p style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--ink-soft); margin-top:8px;">July counts from opening day (21 July). Months are by visit date. The 119 unticketed group visitors are not included.</p>
   </div>
+
+  <div class="opening-hours">Opening hours: July &ndash; October: Tuesday &ndash; Sunday, 10am &ndash; 5pm. November: Tuesday &ndash; Sunday, 10am &ndash; 4pm.</div>
 
   <footer id="pageFooter">
     Mock-up only — the real version pulls live figures from Shopify order data each evening and emails this tally to the Director automatically.
