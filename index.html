@@ -326,6 +326,13 @@
     color: var(--ink-soft);
   }
 
+  .heat-wrap { padding: 0 40px 8px; }
+  .heat-table { width: 100%; border-collapse: collapse; font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+  .heat-table th, .heat-table td { border: 1px solid var(--line); padding: 6px 8px; text-align: center; }
+  .heat-table th { background: var(--olive); color: var(--paper); font-weight: 600; }
+  .heat-table td.hr { text-align: left; background: var(--paper-dark); color: var(--ink); }
+  .heat-note { padding: 6px 40px 0; font-size: 11px; font-style: italic; color: var(--ink-soft); }
+
   .opening-hours {
     padding: 4px 40px 0;
     font-family: 'IBM Plex Mono', monospace;
@@ -504,6 +511,22 @@
     <p style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--ink-soft); margin-top:8px;">July counts from opening day (21 July). Months are by visit date. The 119 unticketed group visitors are not included.</p>
   </div>
 
+  <div class="chart-section" id="hourlySection" style="display:none;">
+    <div class="section-head" style="padding:0 0 18px;">
+      <h2>When Visitors Arrive</h2>
+      <span class="tag" id="hourlyRange">Average people per hour</span>
+    </div>
+    <div class="heat-wrap"><table class="heat-table" id="heatTable"></table></div>
+    <div class="heat-note">Average people per hour on each weekday. Darker = busier. Online people by booked arrival hour; museum shop people by hour of the till sale.</div>
+    <div class="chart-legend" style="margin-top:18px;">
+      <span class="swatch"><span class="dot advance"></span>Online</span>
+      <span class="swatch"><span class="dot onday"></span>Museum Shop</span>
+    </div>
+    <div class="chart-frame">
+      <svg id="hourlyChart" viewBox="0 0 860 300" preserveAspectRatio="none"></svg>
+    </div>
+  </div>
+
   <div class="opening-hours">Opening hours: July &ndash; October: Tuesday &ndash; Sunday, 10am &ndash; 5pm. November: Tuesday &ndash; Sunday, 10am &ndash; 4pm.</div>
 
   <footer id="pageFooter">
@@ -537,6 +560,11 @@ const scale = 341.9;
 // web > CSV), paste that URL here. Until then, PUBLIC_CSV_URL stays empty
 // and the dashboard falls back to generated mock data automatically.
 const PUBLIC_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT7E-SrQkZIpaE_64Z2BkP7x3qYyfSsWf5mLK2gjXrCu0WvU5PPitgttaSFQlhHZjq5frzIgoSMn5k3/pub?gid=1153817393&single=true&output=csv';
+
+// Publish the "Hourly" tab the same way (File > Share > Publish to web >
+// pick the Hourly tab > CSV) and paste its URL here. Left empty, the
+// "When Visitors Arrive" section simply stays hidden.
+const HOURLY_CSV_URL = '';
 
 async function loadTallyData() {
   if (PUBLIC_CSV_URL) {
@@ -982,6 +1010,70 @@ function renderMonthlyChart() {
   document.getElementById('monthlyChartRange').textContent = `${labels[0]} – ${labels[labels.length - 1]}`;
 }
 
+async function renderHourly() {
+  if (!HOURLY_CSV_URL) return;
+  try {
+    const res = await fetch(HOURLY_CSV_URL);
+    if (!res.ok) throw new Error('Fetch failed: ' + res.status);
+    const lines = (await res.text()).trim().split('\n').slice(1).map(l => l.split(','));
+    const order = [2, 3, 4, 5, 6, 0], names = { 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri', 6: 'Sat', 0: 'Sun' };
+    const days = {}, sums = {}, hourSet = {};
+    lines.forEach(c => {
+      const d = (c[0] || '').trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+      const [y, m, dd] = d.split('-').map(Number);
+      const dow = new Date(y, m - 1, dd).getDay();
+      const h = Number(c[1]);
+      (days[dow] = days[dow] || {})[d] = true;
+      sums[dow] = sums[dow] || {};
+      const cell = sums[dow][h] = sums[dow][h] || { online: 0, shop: 0 };
+      cell.online += (Number(c[2]) || 0) + (Number(c[3]) || 0);
+      cell.shop += Number(c[4]) || 0;
+      hourSet[h] = true;
+    });
+    const hours = Object.keys(hourSet).map(Number).sort((a, b) => a - b);
+    if (!hours.length) return;
+    const nOf = dow => (days[dow] ? Object.keys(days[dow]).length : 0);
+    const avg = (dow, h) => {
+      const n = nOf(dow), c = (sums[dow] && sums[dow][h]) || { online: 0, shop: 0 };
+      return { online: n ? c.online / n : 0, shop: n ? c.shop / n : 0 };
+    };
+    const hh = h => String(h).padStart(2, '0') + ':00';
+    let max = 1;
+    hours.forEach(h => order.forEach(d => { const a = avg(d, h); max = Math.max(max, a.online + a.shop); }));
+
+    const table = document.getElementById('heatTable');
+    let html = '<thead><tr><th>Hour</th>' + order.map(d => `<th>${names[d]}</th>`).join('') + '</tr></thead><tbody>';
+    hours.forEach(h => {
+      html += `<tr><td class="hr">${hh(h)}–${hh(h + 1)}</td>`;
+      order.forEach(d => {
+        const a = avg(d, h), v = a.online + a.shop, t = v / max;
+        html += `<td style="background:rgba(91,102,80,${(0.08 + t * 0.85).toFixed(2)});color:${t > 0.55 ? '#fff' : 'inherit'}">${Math.round(v)}</td>`;
+      });
+      html += '</tr>';
+    });
+    table.innerHTML = html + '</tbody>';
+
+    const online = [], shop = [], totals = [];
+    hours.forEach(h => {
+      let on = 0, sh = 0, n = 0;
+      order.forEach(d => { const k = nOf(d); if (k) { const a = avg(d, h); on += a.online * k; sh += a.shop * k; n += k; } });
+      const o = n ? on / n : 0, s2 = n ? sh / n : 0;
+      online.push(o); shop.push(s2); totals.push(o + s2);
+    });
+    const svg = document.getElementById('hourlyChart');
+    svg.innerHTML = '';
+    drawStackedBarChart(svg, hours.map(hh), totals, online, shop,
+      (idx, total, a, o) => [`${hh(hours[idx])} — average ${total.toFixed(1)}`, `online ${a.toFixed(1)} · museum shop ${o.toFixed(1)}`],
+      10, true);
+    const nDays = Object.keys(days).reduce((n, k) => n + Object.keys(days[k]).length, 0);
+    document.getElementById('hourlyRange').textContent = `Average per hour · ${nDays} open days`;
+    document.getElementById('hourlySection').style.display = '';
+  } catch (err) {
+    console.warn('Hourly data unavailable:', err);
+  }
+}
+
 document.getElementById('dailyPrevBtn').onclick = () => { dailyWindowOffset = Math.max(0, dailyWindowOffset - 1); renderDailyWindow(); };
 document.getElementById('dailyNextBtn').onclick = () => { dailyWindowOffset += 1; renderDailyWindow(); };
 document.getElementById('weeklyPrevBtn').onclick = () => { weeklyWindowOffset = Math.max(0, weeklyWindowOffset - 1); renderWeeklyWindow(); };
@@ -996,6 +1088,7 @@ weeklyWindowOffset = Math.max(0, monthsBetween(OPEN_DATE, TODAY) - WEEKLY_WINDOW
 renderDailyWindow();
 renderWeeklyWindow();
 renderMonthlyChart();
+renderHourly();
 
   const sourceTag = document.getElementById('dataSourceTag');
 
