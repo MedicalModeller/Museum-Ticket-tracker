@@ -527,6 +527,49 @@
     </div>
   </div>
 
+  <div class="chart-section" id="leadSection" style="display:none;">
+    <div class="section-head" style="padding:0 0 18px;">
+      <h2>How Far Ahead Online Tickets Are Bought</h2>
+      <span class="tag" id="leadRange">By day of visit</span>
+    </div>
+    <div class="heat-wrap"><table class="heat-table" id="leadTable"></table></div>
+    <div class="heat-note">Share of each visit day's online tickets by how many days before the visit they were bought. Visits to date only. Darker = larger share. "Half booked by" = the point by which half the tickets had been bought.</div>
+    <div class="chart-legend" style="margin-top:18px;">
+      <span class="swatch"><span class="dot advance"></span>Share of tickets</span>
+      <span class="swatch"><span class="dot onday"></span>Running total</span>
+    </div>
+    <div class="chart-frame">
+      <svg id="leadChart" viewBox="0 0 860 300" preserveAspectRatio="none"></svg>
+    </div>
+  </div>
+
+  <div class="chart-section" id="forwardSection" style="display:none;">
+    <div class="section-head" style="padding:0 0 18px;">
+      <h2>Looking Ahead</h2>
+      <span class="tag" id="forwardRange">Online tickets already booked</span>
+    </div>
+    <div class="chart-legend">
+      <span class="swatch"><span class="dot advance"></span>Booked so far</span>
+      <span class="swatch"><span class="dot onday"></span>Usual at this stage</span>
+    </div>
+    <div class="chart-frame">
+      <svg id="forwardChart" viewBox="0 0 860 300" preserveAspectRatio="none"></svg>
+    </div>
+    <div class="heat-note" style="padding-bottom:18px;">Online tickets already booked for each coming open day (bars), against the average booked by the same stage for the same weekday over the previous 8 weeks (red marks).</div>
+    <div class="section-head" style="padding:0 0 12px;">
+      <h2 style="font-size:20px;">Booked Ahead, by Visit Week</h2>
+      <span class="tag" id="weeklyAheadRange">Completed weeks</span>
+    </div>
+    <div class="chart-legend">
+      <span class="swatch"><span class="dot advance"></span>Booked 7+ days ahead</span>
+      <span class="swatch"><span class="dot onday"></span>Booked within a week</span>
+    </div>
+    <div class="chart-frame">
+      <svg id="weeklyAheadChart" viewBox="0 0 860 300" preserveAspectRatio="none"></svg>
+    </div>
+    <div class="heat-note">Online tickets for each completed Tuesday–Sunday week, split by how far ahead they were bought. Watch the olive part to see whether advance bookings fall away over winter.</div>
+  </div>
+
   <div class="opening-hours">Opening hours: July &ndash; October: Tuesday &ndash; Sunday, 10am &ndash; 5pm. November: Tuesday &ndash; Sunday, 10am &ndash; 4pm.</div>
 
   <footer id="pageFooter">
@@ -565,6 +608,16 @@ const PUBLIC_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT7E-SrQ
 // pick the Hourly tab > CSV) and paste its URL here. Left empty, the
 // "When Visitors Arrive" section simply stays hidden.
 const HOURLY_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT7E-SrQkZIpaE_64Z2BkP7x3qYyfSsWf5mLK2gjXrCu0WvU5PPitgttaSFQlhHZjq5frzIgoSMn5k3/pub?gid=1494409740&single=true&output=csv';
+
+// Publish the "Lead Time" tab the same way (File > Share > Publish to web >
+// pick the Lead Time tab > CSV) and paste its URL here. Left empty, the
+// "How Far Ahead" section simply stays hidden.
+const LEAD_CSV_URL = '';
+
+// Publish the "Forward Look" tab the same way (File > Share > Publish to
+// web > pick the Forward Look tab > CSV) and paste its URL here. Left empty,
+// the "Looking Ahead" section simply stays hidden.
+const FORWARD_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT7E-SrQkZIpaE_64Z2BkP7x3qYyfSsWf5mLK2gjXrCu0WvU5PPitgttaSFQlhHZjq5frzIgoSMn5k3/pub?gid=661033547&single=true&output=csv';
 
 async function loadTallyData() {
   if (PUBLIC_CSV_URL) {
@@ -1074,6 +1127,150 @@ async function renderHourly() {
   }
 }
 
+async function renderLeadTime() {
+  if (!LEAD_CSV_URL) return;
+  try {
+    const res = await fetch(LEAD_CSV_URL);
+    if (!res.ok) throw new Error('Fetch failed: ' + res.status);
+    const lines = (await res.text()).trim().split('\n').slice(1).map(l => l.split(','));
+    const dayOrder = ['Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const buckets = [];
+    const counts = {};
+    dayOrder.forEach(d => counts[d] = {});
+    lines.forEach(c => {
+      const day = (c[0] || '').trim(), b = (c[1] || '').trim(), n = Number(c[2]) || 0;
+      if (!counts[day] || !b) return;
+      if (buckets.indexOf(b) === -1) buckets.push(b);
+      counts[day][b] = (counts[day][b] || 0) + n;
+    });
+    if (!buckets.length) return;
+    const totalOf = obj => buckets.reduce((a, b) => a + (obj[b] || 0), 0);
+    const all = {};
+    buckets.forEach(b => all[b] = dayOrder.reduce((n, d) => n + (counts[d][b] || 0), 0));
+    const grand = totalOf(all);
+    if (!grand) return;
+    const halfBy = obj => {
+      const t = totalOf(obj); if (!t) return '–';
+      let run = 0;
+      for (const b of buckets) { run += obj[b] || 0; if (run * 2 >= t) return b; }
+      return '–';
+    };
+
+    const rows = dayOrder.map(d => ({ name: d, obj: counts[d] })).concat([{ name: 'All days', obj: all }]);
+    let html = '<thead><tr><th>Visit day</th>' + buckets.map(b => `<th>${b}</th>`).join('') + '<th>Half booked by</th><th>Tickets</th></tr></thead><tbody>';
+    rows.forEach(r => {
+      const t = totalOf(r.obj);
+      html += `<tr><td class="hr"><strong>${r.name}</strong></td>`;
+      buckets.forEach(b => {
+        const p = t ? (r.obj[b] || 0) / t * 100 : 0, f = Math.min(1, p / 60);
+        html += `<td style="background:rgba(91,102,80,${(0.06 + f * 0.85).toFixed(2)});color:${f > 0.55 ? '#fff' : 'inherit'}">${Math.round(p)}%</td>`;
+      });
+      html += `<td>${halfBy(r.obj)}</td><td>${fmt(t)}</td></tr>`;
+    });
+    document.getElementById('leadTable').innerHTML = html + '</tbody>';
+
+    // Overall chart: bars = share per bucket, line = running total
+    const svg = document.getElementById('leadChart');
+    svg.innerHTML = '';
+    const W = 860, H = 300, padL = 40, padR = 14, padT = 16, padB = 34;
+    const plotW = W - padL - padR, plotH = H - padT - padB;
+    const yAt = pct => padT + plotH - (pct / 100) * plotH;
+    const step = plotW / buckets.length;
+    for (let v = 0; v <= 100; v += 20) {
+      svg.appendChild(svgEl('line', { x1: padL, x2: W - padR, y1: yAt(v), y2: yAt(v), class: 'grid-line' }));
+      const t = svgEl('text', { x: padL - 6, y: yAt(v) + 3, 'text-anchor': 'end', class: 'axis-label' });
+      t.textContent = v + '%';
+      svg.appendChild(t);
+    }
+    let run = 0; const pts = [];
+    buckets.forEach((b, i) => {
+      const share = all[b] / grand * 100; run += share;
+      const bw = step * 0.55, x = padL + i * step + (step - bw) / 2;
+      const rect = svgEl('rect', { x, y: yAt(share), width: bw, height: Math.max(0, padT + plotH - yAt(share)), class: 'bar-advance' });
+      const title = svgEl('title', {}); title.textContent = `${b}: ${share.toFixed(1)}% of online tickets (running total ${run.toFixed(1)}%)`;
+      rect.appendChild(title); svg.appendChild(rect);
+      const lbl = svgEl('text', { x: padL + i * step + step / 2, y: H - 12, 'text-anchor': 'middle', class: 'axis-label' });
+      lbl.textContent = b; svg.appendChild(lbl);
+      pts.push([padL + i * step + step / 2, yAt(run)]);
+    });
+    svg.appendChild(svgEl('polyline', { points: pts.map(p => p.join(',')).join(' '), fill: 'none', stroke: '#8B3A2F', 'stroke-width': 2 }));
+    pts.forEach(p => svg.appendChild(svgEl('circle', { cx: p[0], cy: p[1], r: 3.5, fill: '#8B3A2F' })));
+
+    document.getElementById('leadRange').textContent = `${fmt(grand)} online tickets · visits to date`;
+    document.getElementById('leadSection').style.display = '';
+  } catch (err) {
+    console.warn('Lead time data unavailable:', err);
+  }
+}
+
+async function renderForward() {
+  if (!FORWARD_CSV_URL) return;
+  try {
+    const res = await fetch(FORWARD_CSV_URL);
+    if (!res.ok) throw new Error('Fetch failed: ' + res.status);
+    const lines = (await res.text()).trim().split('\n').slice(1).map(l => l.split(','));
+    const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const parseD = d => { const [y, m, dd] = d.split('-').map(Number); return new Date(y, m - 1, dd); };
+    const up = [], wk = [];
+    lines.forEach(c => {
+      const sec = (c[0] || '').trim(), key = (c[1] || '').trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return;
+      const v1 = Number(c[2]) || 0, v2raw = (c[3] || '').trim();
+      if (sec === 'Upcoming') up.push({ d: parseD(key), booked: v1, typical: v2raw === '' ? null : Number(v2raw) });
+      else if (sec === 'Weekly') wk.push({ d: parseD(key), ahead: v1, late: Number(v2raw) || 0 });
+    });
+    if (!up.length) return;
+
+    // ---- Chart 1: booked so far (bars) vs usual at this stage (red marks)
+    const svg = document.getElementById('forwardChart');
+    svg.innerHTML = '';
+    const W = 860, H = 300, padL = 40, padR = 12, padT = 16, padB = 34;
+    const plotW = W - padL - padR, plotH = H - padT - padB;
+    const rawMax = Math.max(10, ...up.map(u => Math.max(u.booked, u.typical || 0))) * 1.1;
+    const grid = rawMax > 100 ? 50 : 20;
+    const maxVal = Math.ceil(rawMax / grid) * grid;
+    const yAt = v => padT + plotH - (v / maxVal) * plotH;
+    for (let v = 0; v <= maxVal; v += grid) {
+      svg.appendChild(svgEl('line', { x1: padL, x2: W - padR, y1: yAt(v), y2: yAt(v), class: 'grid-line' }));
+      const t = svgEl('text', { x: padL - 6, y: yAt(v) + 3, 'text-anchor': 'end', class: 'axis-label' });
+      t.textContent = v; svg.appendChild(t);
+    }
+    const step = plotW / up.length, bw = Math.max(3, step * 0.62);
+    up.forEach((u, i) => {
+      const x = padL + i * step + (step - bw) / 2;
+      const rect = svgEl('rect', { x, y: yAt(u.booked), width: bw, height: Math.max(0, padT + plotH - yAt(u.booked)), class: 'bar-advance' });
+      const title = svgEl('title', {});
+      const lbl = `${u.d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}`;
+      title.textContent = `${lbl}: ${u.booked} booked so far` + (u.typical === null ? '' : ` · usual at this stage ${u.typical.toFixed(0)}`);
+      rect.appendChild(title); svg.appendChild(rect);
+      if (u.typical !== null) {
+        svg.appendChild(svgEl('line', { x1: x - 1, x2: x + bw + 1, y1: yAt(u.typical), y2: yAt(u.typical), stroke: '#8B3A2F', 'stroke-width': 2.5 }));
+      }
+      if (u.d.getDay() === 2 || i === 0) { // label each Tuesday (and the first bar)
+        const tx = svgEl('text', { x: x + bw / 2, y: H - 12, 'text-anchor': 'middle', class: 'axis-label' });
+        tx.textContent = `${u.d.getDate()} ${MON[u.d.getMonth()]}`; svg.appendChild(tx);
+      }
+    });
+    const totalBooked = up.reduce((n, u) => n + u.booked, 0);
+    document.getElementById('forwardRange').textContent = `${fmt(totalBooked)} online tickets booked · next ${up.length} open days`;
+
+    // ---- Chart 2: weekly split, booked 7+ days ahead vs within a week
+    if (wk.length) {
+      const labels = wk.map(w => `${w.d.getDate()} ${MON[w.d.getMonth()]}`);
+      const totals = wk.map(w => w.ahead + w.late);
+      const svg2 = document.getElementById('weeklyAheadChart');
+      svg2.innerHTML = '';
+      drawStackedBarChart(svg2, labels, totals, wk.map(w => w.ahead), wk.map(w => w.late),
+        (idx, total, a, o) => [`Week of ${labels[idx]} — ${fmt(total)} online tickets`, `booked 7+ days ahead ${fmt(a)} · within a week ${fmt(o)}`],
+        100, true);
+      document.getElementById('weeklyAheadRange').textContent = `${wk.length} completed weeks`;
+    }
+    document.getElementById('forwardSection').style.display = '';
+  } catch (err) {
+    console.warn('Forward look data unavailable:', err);
+  }
+}
+
 document.getElementById('dailyPrevBtn').onclick = () => { dailyWindowOffset = Math.max(0, dailyWindowOffset - 1); renderDailyWindow(); };
 document.getElementById('dailyNextBtn').onclick = () => { dailyWindowOffset += 1; renderDailyWindow(); };
 document.getElementById('weeklyPrevBtn').onclick = () => { weeklyWindowOffset = Math.max(0, weeklyWindowOffset - 1); renderWeeklyWindow(); };
@@ -1089,6 +1286,8 @@ renderDailyWindow();
 renderWeeklyWindow();
 renderMonthlyChart();
 renderHourly();
+renderLeadTime();
+renderForward();
 
   const sourceTag = document.getElementById('dataSourceTag');
 
