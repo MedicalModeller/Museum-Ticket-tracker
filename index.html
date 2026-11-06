@@ -319,6 +319,9 @@
 
   .chart-legend .dot.advance { background: var(--olive); }
   .chart-legend .dot.onday { background: var(--stamp-red); }
+  .chart-legend .dot.mid { background: var(--brass); }
+  .bar-mid { fill: var(--brass); }
+  .bar-mid:hover { opacity: 0.8; }
 
   footer {
     padding: 18px 40px 34px;
@@ -562,12 +565,13 @@
     </div>
     <div class="chart-legend">
       <span class="swatch"><span class="dot advance"></span>Booked 7+ days ahead</span>
-      <span class="swatch"><span class="dot onday"></span>Booked within a week</span>
+      <span class="swatch"><span class="dot mid"></span>Booked 1&ndash;6 days ahead</span>
+      <span class="swatch"><span class="dot onday"></span>Booked on the day</span>
     </div>
     <div class="chart-frame">
       <svg id="weeklyAheadChart" viewBox="0 0 860 300" preserveAspectRatio="none"></svg>
     </div>
-    <div class="heat-note">Online tickets for each completed Tuesday–Sunday week, split by how far ahead they were bought. Watch the olive part to see whether advance bookings fall away over winter.</div>
+    <div class="heat-note">Online tickets for each completed Tuesday–Sunday week, split by how far ahead they were bought: 7+ days ahead (olive), 1–6 days ahead (gold) and on the day itself (red). Hover or tap a bar for numbers and percentages. Watch the olive part to see whether advance bookings fall away over winter.</div>
   </div>
 
   <div class="opening-hours">Opening hours: July &ndash; October: Tuesday &ndash; Sunday, 10am &ndash; 5pm. November: Tuesday &ndash; Sunday, 10am &ndash; 4pm.</div>
@@ -1217,7 +1221,7 @@ async function renderForward() {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return;
       const v1 = Number(c[2]) || 0, v2raw = (c[3] || '').trim();
       if (sec === 'Upcoming') up.push({ d: parseD(key), booked: v1, typical: v2raw === '' ? null : Number(v2raw) });
-      else if (sec === 'Weekly') wk.push({ d: parseD(key), ahead: v1, late: Number(v2raw) || 0 });
+      else if (sec === 'Weekly') wk.push({ d: parseD(key), ahead: v1, within: Number(v2raw) || 0, same: Number((c[4] || '').trim()) || 0 });
     });
     if (!up.length) return;
 
@@ -1254,15 +1258,60 @@ async function renderForward() {
     const totalBooked = up.reduce((n, u) => n + u.booked, 0);
     document.getElementById('forwardRange').textContent = `${fmt(totalBooked)} online tickets booked · next ${up.length} open days`;
 
-    // ---- Chart 2: weekly split, booked 7+ days ahead vs within a week
+    // ---- Chart 2: weekly split into three groups, with percentages in the tooltip
     if (wk.length) {
       const labels = wk.map(w => `${w.d.getDate()} ${MON[w.d.getMonth()]}`);
-      const totals = wk.map(w => w.ahead + w.late);
       const svg2 = document.getElementById('weeklyAheadChart');
       svg2.innerHTML = '';
-      drawStackedBarChart(svg2, labels, totals, wk.map(w => w.ahead), wk.map(w => w.late),
-        (idx, total, a, o) => [`Week of ${labels[idx]} — ${fmt(total)} online tickets`, `booked 7+ days ahead ${fmt(a)} · within a week ${fmt(o)}`],
-        100, true);
+      const W2 = 860, H2 = 300, pL = 40, pR = 12, pT = 16, pB = 28;
+      const pW = W2 - pL - pR, pH = H2 - pT - pB;
+      const tots = wk.map(w => w.ahead + w.within + w.same);
+      const step2 = 100;
+      const max2 = Math.ceil(Math.max(...tots, 10) * 1.1 / step2) * step2;
+      const y2 = v => pT + pH - (v / max2) * pH;
+      for (let v = 0; v <= max2; v += step2) {
+        svg2.appendChild(svgEl('line', { x1: pL, x2: W2 - pR, y1: y2(v), y2: y2(v), class: 'grid-line' }));
+        const t = svgEl('text', { x: pL - 6, y: y2(v) + 3, 'text-anchor': 'end', class: 'axis-label' });
+        t.textContent = v; svg2.appendChild(t);
+      }
+      const sx = pW / wk.length, bw2 = Math.min(sx * 0.6, 90);
+      const tipG = svgEl('g', { visibility: 'hidden' });
+      const tipBg = svgEl('rect', { class: 'chart-tooltip-bg', rx: 3 });
+      const tipLines = [0, 1, 2, 3].map(() => { const t = svgEl('text', { class: 'chart-tooltip', x: 0, y: 0 }); tipG.appendChild(t); return t; });
+      tipG.insertBefore(tipBg, tipG.firstChild);
+      const pct = (n, tot) => tot ? Math.round(n / tot * 100) + '%' : '0%';
+      wk.forEach((w, i) => {
+        const tot = tots[i], cx = pL + (i + 0.5) * sx, x = cx - bw2 / 2;
+        const segs = [['bar-advance', w.ahead], ['bar-mid', w.within], ['bar-onday', w.same]];
+        let acc = 0;
+        const show = () => {
+          const lines = [
+            `Week of ${labels[i]} — ${fmt(tot)} online tickets`,
+            `7+ days ahead: ${fmt(w.ahead)} (${pct(w.ahead, tot)})`,
+            `1-6 days ahead: ${fmt(w.within)} (${pct(w.within, tot)})`,
+            `On the day: ${fmt(w.same)} (${pct(w.same, tot)})`
+          ];
+          lines.forEach((l, k) => tipLines[k].textContent = l);
+          const boxW = Math.max(...lines.map(l => l.length)) * 6.2 + 16;
+          const boxX = Math.min(Math.max(cx - boxW / 2, pL), W2 - pR - boxW);
+          const boxY = Math.max(y2(tot) - 70, pT);
+          tipBg.setAttribute('x', boxX); tipBg.setAttribute('y', boxY);
+          tipBg.setAttribute('width', boxW); tipBg.setAttribute('height', 62);
+          tipLines.forEach((t, k) => { t.setAttribute('x', boxX + 8); t.setAttribute('y', boxY + 14 + k * 14); });
+          tipG.setAttribute('visibility', 'visible');
+        };
+        const hide = () => tipG.setAttribute('visibility', 'hidden');
+        segs.forEach(([cls, val]) => {
+          const top = y2(acc + val), bottom = y2(acc);
+          const r = svgEl('rect', { x, y: top, width: bw2, height: Math.max(0, bottom - top), class: cls });
+          r.addEventListener('pointerenter', show); r.addEventListener('pointerleave', hide); r.addEventListener('pointerdown', show);
+          svg2.appendChild(r);
+          acc += val;
+        });
+        const lb = svgEl('text', { x: cx, y: H2 - 8, 'text-anchor': 'middle', class: 'axis-label' });
+        lb.textContent = labels[i]; svg2.appendChild(lb);
+      });
+      svg2.appendChild(tipG);
       document.getElementById('weeklyAheadRange').textContent = `${wk.length} completed weeks`;
     }
     document.getElementById('forwardSection').style.display = '';
