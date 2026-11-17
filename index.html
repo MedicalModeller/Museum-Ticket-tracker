@@ -561,7 +561,11 @@
     <div class="heat-note" style="padding-bottom:18px;">Online tickets already booked for each coming open day (bars), against the average booked by the same stage for the same weekday over the previous 8 weeks (red marks).</div>
     <div class="section-head" style="padding:0 0 12px;">
       <h2 style="font-size:20px;">Booked Ahead, by Visit Week</h2>
-      <span class="tag" id="weeklyAheadRange">Completed weeks</span>
+      <div class="chart-nav">
+        <button class="nav-btn" id="aheadPrevBtn" aria-label="Earlier">&larr;</button>
+        <span class="tag" id="weeklyAheadRange">Completed weeks</span>
+        <button class="nav-btn" id="aheadNextBtn" aria-label="Later">&rarr;</button>
+      </div>
     </div>
     <div class="chart-legend">
       <span class="swatch"><span class="dot advance"></span>Booked 7+ days ahead</span>
@@ -1260,14 +1264,20 @@ async function renderForward() {
 
     // ---- Chart 2: weekly split into three groups, with percentages in the tooltip
     if (wk.length) {
+      const AHEAD_WINDOW = 12, AHEAD_STEP = 4;
+      const wkFull = wk;
+      let aheadOffset = Math.max(0, wkFull.length - AHEAD_WINDOW);
+      const allTots = wk.map(w => w.ahead + w.within + w.same);
+      const step2 = 100;
+      const max2 = Math.ceil(Math.max(...allTots, 10) * 1.1 / step2) * step2; // fixed scale so windows compare
+      const drawAhead = () => {
+      const wk = wkFull.slice(aheadOffset, aheadOffset + AHEAD_WINDOW);
       const labels = wk.map(w => `${w.d.getDate()} ${MON[w.d.getMonth()]}`);
       const svg2 = document.getElementById('weeklyAheadChart');
       svg2.innerHTML = '';
       const W2 = 860, H2 = 300, pL = 40, pR = 12, pT = 16, pB = 28;
       const pW = W2 - pL - pR, pH = H2 - pT - pB;
       const tots = wk.map(w => w.ahead + w.within + w.same);
-      const step2 = 100;
-      const max2 = Math.ceil(Math.max(...tots, 10) * 1.1 / step2) * step2;
       const y2 = v => pT + pH - (v / max2) * pH;
       for (let v = 0; v <= max2; v += step2) {
         svg2.appendChild(svgEl('line', { x1: pL, x2: W2 - pR, y1: y2(v), y2: y2(v), class: 'grid-line' }));
@@ -1312,7 +1322,14 @@ async function renderForward() {
         lb.textContent = labels[i]; svg2.appendChild(lb);
       });
       svg2.appendChild(tipG);
-      document.getElementById('weeklyAheadRange').textContent = `${wk.length} completed weeks`;
+      document.getElementById('weeklyAheadRange').textContent =
+        `${labels[0]} – ${labels[labels.length - 1]} · ${wkFull.length} weeks in all`;
+      document.getElementById('aheadPrevBtn').disabled = aheadOffset <= 0;
+      document.getElementById('aheadNextBtn').disabled = aheadOffset + AHEAD_WINDOW >= wkFull.length;
+      };
+      document.getElementById('aheadPrevBtn').onclick = () => { aheadOffset = Math.max(0, aheadOffset - AHEAD_STEP); drawAhead(); };
+      document.getElementById('aheadNextBtn').onclick = () => { aheadOffset = Math.min(Math.max(0, wkFull.length - AHEAD_WINDOW), aheadOffset + AHEAD_STEP); drawAhead(); };
+      drawAhead();
     }
     document.getElementById('forwardSection').style.display = '';
   } catch (err) {
